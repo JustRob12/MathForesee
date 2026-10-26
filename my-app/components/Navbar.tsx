@@ -41,13 +41,14 @@ export default function Navbar() {
         try {
           const { data: survey } = await supabase
             .from('survey_responses')
-            .select('id, average_grade')
+            .select('id, is_completed, predicted_grade, average_grade')
             .eq('user_id', user.id)
-            .not('average_grade', 'is', null)
+            .or('is_completed.eq.true,predicted_grade.not.is.null,average_grade.not.is.null')
+            .order('created_at', { ascending: false })
             .limit(1)
             .maybeSingle();
 
-          if (survey && survey.average_grade !== null && survey.average_grade !== undefined) {
+          if (survey && (survey.is_completed === true || survey.predicted_grade != null || survey.average_grade != null)) {
             setHasSurveyResult(true);
           } else {
             setHasSurveyResult(false);
@@ -73,13 +74,14 @@ export default function Navbar() {
         try {
           const { data: survey } = await supabase
             .from('survey_responses')
-            .select('id, average_grade')
+            .select('id, is_completed, predicted_grade, average_grade')
             .eq('user_id', currentUser.id)
-            .not('average_grade', 'is', null)
+            .or('is_completed.eq.true,predicted_grade.not.is.null,average_grade.not.is.null')
+            .order('created_at', { ascending: false })
             .limit(1)
             .maybeSingle();
 
-          if (survey && survey.average_grade !== null && survey.average_grade !== undefined) {
+          if (survey && (survey.is_completed === true || survey.predicted_grade != null || survey.average_grade != null)) {
             setHasSurveyResult(true);
           } else {
             setHasSurveyResult(false);

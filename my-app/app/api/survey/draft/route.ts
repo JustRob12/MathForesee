@@ -52,9 +52,9 @@ export async function POST(req: NextRequest) {
     if (!targetId && userId) {
       const { data: existing } = await supabase
         .from('survey_responses')
-        .select('id, average_grade')
+        .select('id, is_completed')
         .eq('user_id', userId)
-        .is('average_grade', null)
+        .eq('is_completed', false)
         .order('created_at', { ascending: false })
         .limit(1)
         .maybeSingle();

@@ -285,13 +285,13 @@ export const SURVEY_QUESTIONS: SurveyQuestion[] = [
     id: 'ma_10',
     number: 10,
     category: 'anxiety',
-    text: 'After the exam, still feeling guilty about the answer.',
+    text: 'After the exam, I still feel guilty about the answer.',
   },
   {
     id: 'ma_11',
     number: 11,
     category: 'anxiety',
-    text: 'I am worry about something bad to happen in my performance in this subject.',
+    text: 'I am worried that something bad will happen in my performance in this subject.',
   },
   {
     id: 'ma_12',
@@ -343,23 +343,62 @@ export interface FactorResult {
 }
 
 /**
+ * Maps Parents' Monthly Income category to its numeric scale (1 - 5).
+ * 1 = Below ₱10,000
+ * 2 = ₱10,000 - ₱20,000
+ * 3 = ₱20,001 - ₱30,000
+ * 4 = ₱30,001 - ₱40,000 / ₱40,001 - ₱50,000
+ * 5 = Above ₱50,000
+ */
+export function getParentMonthlyIncomeScore(income?: string | null): number {
+  if (!income) return 3;
+  const trimmed = income.trim().toLowerCase();
+  if (trimmed.includes('below')) return 1;
+  if (trimmed.includes('10,000') && trimmed.includes('20,000')) return 2;
+  if (trimmed.includes('20,001') || trimmed.includes('30,000')) return 3;
+  if (trimmed.includes('30,001') || trimmed.includes('40,000') || trimmed.includes('40,001') || trimmed.includes('50,000')) {
+    if (trimmed.includes('above')) return 5;
+    return 4;
+  }
+  if (trimmed.includes('above') || trimmed.includes('50,000')) return 5;
+  return 3;
+}
+
+/**
  * Statistical Analysis & Accuracy Test Calculations
- * Formulas from Page 6 of Research Document:
+ * Multiple Linear Regression Equation formed from Table 1, Page 30 of Research Document:
+ * 
+ * Grades = 80.92 + 0.294(PMI) + 0.887(CM) + 0.865(OPI) - 1.281(MAnx) + 1.673(MSc)
+ * 
+ * 5 Statistically Significant Factors (p < 0.05):
+ * 1. PMI  = Parents' Monthly Income (B = 0.294, p = 0.049)
+ * 2. CM   = Concentration and Memory (B = 0.887, p = 0.043)
+ * 3. OPI  = Organizing and Processing Information (B = 0.865, p = 0.046)
+ * 4. MAnx = Mathematics Anxiety (B = -1.281, p = 0.001)
+ * 5. MSc  = Mathematics Self-Concept (B = 1.673, p = 0.000)
+ * Constant = 80.92 (p = 0.000)
+ * Model Summary: R = 0.886; R^2 = 0.785; F = 72.706; p = 0.000
+ * 
+ * Accuracy Test Formula (Page 6 & Page 32 of Research Document):
  * Error rate (%) = [|Actual Grade - Predicted Grade| / Actual Grade] * 100
  * Mean Prediction Accuracy (%) = 100 - Error rate (%)
+ * Empirical Study Benchmark (222 entries): Error Rate = 3.56%, Prediction Accuracy = 96.44%
  */
 export function calculateSurveyResults(
-  q1: number,
-  q2: number,
-  q3: number,
-  answers: Record<string, number>
+  q1?: number | null,
+  q2?: number | null,
+  q3?: number | null,
+  answers: Record<string, number> = {},
+  monthlyIncome?: string | null
 ) {
-  // 1. Actual Average Grade: (Q1 + Q2 + Q3) / 3
-  const validGrades = [q1, q2, q3].filter((g) => !isNaN(g) && g > 0);
+  // 1. Actual Average Grade: (Q1 + Q2 + Q3) / 3 (if provided by the student)
+  const validGrades = [q1, q2, q3].filter(
+    (g): g is number => typeof g === 'number' && !isNaN(g) && g > 0
+  );
   const averageGrade =
     validGrades.length > 0
       ? Number((validGrades.reduce((a, b) => a + b, 0) / validGrades.length).toFixed(2))
-      : 0;
+      : null;
 
   // 2. Compute Mean for each factor (1.00 - 5.00)
   const getCategoryMean = (cat: 'concentration' | 'organizing' | 'anxiety' | 'selfConcept') => {
@@ -443,24 +482,30 @@ export function calculateSurveyResults(
     ((rawConc + rawOrg + rawSelf + invertedAnxiety) / 4).toFixed(2)
   );
 
-  // 5. Multiple Linear Regression Forecast & Trajectory:
-  // Trajectory based on Q1-Q3 slope, modulated by the independent factor composite
-  const deltaTrend = (q3 - q1) * 0.45;
-  const factorAdjustment = (overallFactorScore - 3.0) * 1.6;
-  const rawPredictedQ4 = q3 + deltaTrend + factorAdjustment;
-  const predictedQ4 = Number(Math.max(65, Math.min(99, rawPredictedQ4)).toFixed(1));
+  // 5. Formed Multiple Linear Regression Equation (Table 1, Page 30 of Research Document):
+  // Formula: Grades = 80.92 + 0.294*PMI + 0.887*CM + 0.865*OPI - 1.281*MAnx + 1.673*MSc
+  const pmiScore = getParentMonthlyIncomeScore(monthlyIncome);
+  const rawPredictedGrade =
+    80.92 +
+    0.294 * pmiScore +
+    0.887 * rawConc +
+    0.865 * rawOrg -
+    1.281 * rawAnx +
+    1.673 * rawSelf;
+  const predictedFinalGrade = Number(Math.max(65, Math.min(99.9, rawPredictedGrade)).toFixed(2));
+  const predictedQ4 = predictedFinalGrade;
 
-  const predictedFinalGrade = Number(
-    ((q1 + q2 + q3 + predictedQ4) / 4).toFixed(2)
-  );
-
-  // 6. Accuracy Test Formula (Page 6 of PDF):
+  // 6. Accuracy Test Formula (Page 6 & Page 32 of Research Document):
   // Error rate (%) = [(Actual Grade - Predicted Grade) / Actual Grade] * 100
-  const baselineActual = averageGrade > 0 ? averageGrade : 85;
-  const errorRate = Number(
-    (Math.abs((baselineActual - predictedFinalGrade) / baselineActual) * 100).toFixed(2)
-  );
-  const predictionAccuracy = Number((100 - errorRate).toFixed(2));
+  const hasActualGrades = averageGrade !== null && averageGrade > 0;
+  const errorRate =
+    hasActualGrades && averageGrade !== null
+      ? Number((Math.abs((averageGrade - predictedFinalGrade) / averageGrade) * 100).toFixed(2))
+      : null;
+  const predictionAccuracy =
+    hasActualGrades && errorRate !== null
+      ? Number((100 - errorRate).toFixed(2))
+      : 96.44; // Research Empirical Accuracy Benchmark from 222 respondents (Table 2, Page 32)
 
   // 7. General Student Advice & Summary
   const actionableAdvice: string[] = [
@@ -487,6 +532,8 @@ export function calculateSurveyResults(
 
   return {
     averageGrade,
+    hasActualGrades,
+    pmiScore,
     predictedQ4,
     predictedGrade: predictedFinalGrade,
     errorRate,

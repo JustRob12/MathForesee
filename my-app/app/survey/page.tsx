@@ -210,7 +210,7 @@ export default function SurveyPage() {
             if (dbDraft.current_category) {
               setActiveFactorTab(dbDraft.current_category as any);
             }
-            if (dbDraft.grade_q1 && dbDraft.grade_q2 && dbDraft.grade_q3) {
+            if ((dbDraft.answers && Object.keys(dbDraft.answers).length > 0) || (dbDraft.grade_q1 || dbDraft.grade_q2 || dbDraft.grade_q3)) {
               setCurrentStep(2);
             }
             setIsRestored(true);
@@ -307,18 +307,27 @@ export default function SurveyPage() {
   // Part I validation and navigation
   const handleProceedToPart2 = () => {
     setErrorMessage(null);
-    const q1 = parseFloat(gradeQ1);
-    const q2 = parseFloat(gradeQ2);
-    const q3 = parseFloat(gradeQ3);
     const parsedAge = parseInt(age, 10);
 
-    if (isNaN(parsedAge) || parsedAge < 5 || parsedAge > 120) {
+    if (age && (isNaN(parsedAge) || parsedAge < 5 || parsedAge > 120)) {
       setErrorMessage('Please enter a valid age between 5 and 120.');
       return;
     }
 
-    if (isNaN(q1) || isNaN(q2) || isNaN(q3) || q1 < 50 || q2 < 50 || q3 < 50 || q1 > 100 || q2 > 100 || q3 > 100) {
-      setErrorMessage('Please enter valid numeric grades for Q1, Q2, and Q3 (between 50 and 100).');
+    const q1 = gradeQ1.trim() !== '' ? parseFloat(gradeQ1) : null;
+    const q2 = gradeQ2.trim() !== '' ? parseFloat(gradeQ2) : null;
+    const q3 = gradeQ3.trim() !== '' ? parseFloat(gradeQ3) : null;
+
+    if (q1 !== null && (isNaN(q1) || q1 < 50 || q1 > 100)) {
+      setErrorMessage('Quarter 1 (Q1) grade must be a number between 50 and 100 if provided.');
+      return;
+    }
+    if (q2 !== null && (isNaN(q2) || q2 < 50 || q2 > 100)) {
+      setErrorMessage('Quarter 2 (Q2) grade must be a number between 50 and 100 if provided.');
+      return;
+    }
+    if (q3 !== null && (isNaN(q3) || q3 < 50 || q3 > 100)) {
+      setErrorMessage('Quarter 3 (Q3) grade must be a number between 50 and 100 if provided.');
       return;
     }
 
@@ -368,11 +377,11 @@ export default function SurveyPage() {
       return;
     }
 
-    const q1 = parseFloat(gradeQ1) || 0;
-    const q2 = parseFloat(gradeQ2) || 0;
-    const q3 = parseFloat(gradeQ3) || 0;
+    const q1 = gradeQ1.trim() !== '' ? parseFloat(gradeQ1) : null;
+    const q2 = gradeQ2.trim() !== '' ? parseFloat(gradeQ2) : null;
+    const q3 = gradeQ3.trim() !== '' ? parseFloat(gradeQ3) : null;
 
-    const computed = calculateSurveyResults(q1, q2, q3, answers);
+    const computed = calculateSurveyResults(q1, q2, q3, answers, monthlyIncome);
     setResults(computed);
 
     // Save final completed response to Supabase
@@ -390,7 +399,7 @@ export default function SurveyPage() {
         user_id: currentUserId,
         is_completed: true,
         sex,
-        age: parseInt(age, 10),
+        age: age ? parseInt(age, 10) : null,
         grade_q1: q1,
         grade_q2: q2,
         grade_q3: q3,
@@ -628,19 +637,27 @@ export default function SurveyPage() {
                 </div>
               </div>
 
-              {/* Grades in Mathematics */}
+              {/* Grades in Mathematics (Optional) */}
               <div className="p-5 rounded-xl bg-slate-50 border border-slate-200">
-                <div className="flex items-center justify-between mb-3">
-                  <label className="text-xs font-bold text-slate-800 uppercase tracking-wider">
-                    Grades in Mathematics (Quarterly)
-                  </label>
+                <div className="flex items-center justify-between mb-2">
+                  <div className="flex items-center gap-2">
+                    <label className="text-xs font-bold text-slate-800 uppercase tracking-wider">
+                      Grades in Mathematics (Quarterly)
+                    </label>
+                    <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-[#f6d548] text-slate-900 border border-[#f6d548]">
+                      Optional
+                    </span>
+                  </div>
                   <span className="text-[11px] text-slate-500">Scale: 50 – 100</span>
                 </div>
+                <p className="text-xs text-slate-500 mb-3.5">
+                  Optional: If you haven&apos;t received your quarterly grades yet, you can leave these blank. MathForesee will still predict your mathematics achievement using the formed regression equation and your 5 significant non-academic factors.
+                </p>
 
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                   <div>
                     <label className="block text-xs text-slate-600 mb-1 font-semibold">
-                      Quarter 1 (Q1)
+                      Quarter 1 (Q1) <span className="text-slate-400 font-normal">(Optional)</span>
                     </label>
                     <input
                       type="number"
@@ -649,14 +666,14 @@ export default function SurveyPage() {
                       step="0.1"
                       value={gradeQ1}
                       onChange={(e) => setGradeQ1(e.target.value)}
-                      placeholder="e.g. 85"
+                      placeholder="e.g. 85 (optional)"
                       className="w-full px-3.5 py-2.5 rounded-lg border border-slate-300 text-sm bg-white text-slate-900 font-bold focus:outline-none focus:ring-2 focus:ring-[#2a632d]"
                     />
                   </div>
 
                   <div>
                     <label className="block text-xs text-slate-600 mb-1 font-semibold">
-                      Quarter 2 (Q2)
+                      Quarter 2 (Q2) <span className="text-slate-400 font-normal">(Optional)</span>
                     </label>
                     <input
                       type="number"
@@ -665,14 +682,14 @@ export default function SurveyPage() {
                       step="0.1"
                       value={gradeQ2}
                       onChange={(e) => setGradeQ2(e.target.value)}
-                      placeholder="e.g. 87"
+                      placeholder="e.g. 87 (optional)"
                       className="w-full px-3.5 py-2.5 rounded-lg border border-slate-300 text-sm bg-white text-slate-900 font-bold focus:outline-none focus:ring-2 focus:ring-[#2a632d]"
                     />
                   </div>
 
                   <div>
                     <label className="block text-xs text-slate-600 mb-1 font-semibold">
-                      Quarter 3 (Q3)
+                      Quarter 3 (Q3) <span className="text-slate-400 font-normal">(Optional)</span>
                     </label>
                     <input
                       type="number"
@@ -681,17 +698,21 @@ export default function SurveyPage() {
                       step="0.1"
                       value={gradeQ3}
                       onChange={(e) => setGradeQ3(e.target.value)}
-                      placeholder="e.g. 89"
+                      placeholder="e.g. 89 (optional)"
                       className="w-full px-3.5 py-2.5 rounded-lg border border-slate-300 text-sm bg-white text-slate-900 font-bold focus:outline-none focus:ring-2 focus:ring-[#2a632d]"
                     />
                   </div>
                 </div>
 
-                {gradeQ1 && gradeQ2 && gradeQ3 && (
+                {(gradeQ1.trim() !== '' || gradeQ2.trim() !== '' || gradeQ3.trim() !== '') && (
                   <div className="mt-3 text-xs text-slate-600 flex items-center justify-between border-t border-slate-200 pt-2 font-medium">
-                    <span>Actual Grade Average (Q1 + Q2 + Q3) / 3:</span>
+                    <span>Actual Grade Average of Entered Quarters:</span>
                     <span className="font-bold text-[#2a632d] text-sm">
-                      {((parseFloat(gradeQ1) + parseFloat(gradeQ2) + parseFloat(gradeQ3)) / 3).toFixed(2)}%
+                      {(
+                        [parseFloat(gradeQ1), parseFloat(gradeQ2), parseFloat(gradeQ3)]
+                          .filter((g) => !isNaN(g) && g > 0)
+                          .reduce((a, b, _, arr) => a + b / arr.length, 0)
+                      ).toFixed(2)}%
                     </span>
                   </div>
                 )}
@@ -1071,17 +1092,19 @@ export default function SurveyPage() {
               )}
             </div>
 
-            {/* Academic Grade & Statistical Accuracy Test (Page 6 Formulas) */}
+            {/* Academic Grade & Statistical Accuracy Test (Formed Regression & Page 6/32 Formulas) */}
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
               <div className="bg-white rounded-xl border border-slate-200 p-5 shadow-sm">
                 <span className="text-xs font-bold uppercase tracking-wider text-slate-500">
                   Actual Average Grade
                 </span>
                 <div className="text-3xl font-extrabold text-slate-900 mt-2">
-                  {results.averageGrade}%
+                  {results.averageGrade != null ? `${results.averageGrade}%` : 'Optional (N/A)'}
                 </div>
                 <div className="text-[11px] text-slate-500 mt-1">
-                  Formula: (Q1: {gradeQ1} + Q2: {gradeQ2} + Q3: {gradeQ3}) / 3
+                  {results.averageGrade != null
+                    ? `Formula: (Q1 + Q2 + Q3) / 3`
+                    : 'Quarterly grades were not provided'}
                 </div>
               </div>
 
@@ -1093,33 +1116,74 @@ export default function SurveyPage() {
                   {results.predictedGrade}%
                 </div>
                 <div className="inline-block px-2 py-0.5 rounded text-[10px] font-bold bg-[#f6d548] text-slate-900 mt-1">
-                  Multiple Linear Regression
+                  Formed Regression (5 Significant Factors)
                 </div>
               </div>
 
-              {/* Statistical Error Rate Card (Page 6 Formula) */}
+              {/* Statistical Error Rate Card (Page 6 / Table 2 Formula) */}
               <div className="bg-white rounded-xl border border-slate-200 p-5 shadow-sm">
                 <span className="text-xs font-bold uppercase tracking-wider text-slate-500">
                   Accuracy Test Error Rate
                 </span>
                 <div className="text-3xl font-extrabold text-slate-900 mt-2">
-                  {results.errorRate}%
+                  {results.errorRate != null ? `${results.errorRate}%` : '3.56%'}
                 </div>
                 <div className="text-[10px] text-slate-500 mt-1 font-mono">
-                  [(|Actual − Pred|) / Actual] × 100
+                  {results.errorRate != null
+                    ? '[(|Actual − Pred|) / Actual] × 100'
+                    : 'Research Benchmark Average (Table 2)'}
                 </div>
               </div>
 
-              {/* Model Prediction Accuracy Card (Page 6 Formula) */}
+              {/* Model Prediction Accuracy Card (Page 6 / Table 2 Formula) */}
               <div className="bg-white rounded-xl border border-slate-200 p-5 shadow-sm relative overflow-hidden">
                 <span className="text-xs font-bold uppercase tracking-wider text-slate-500">
                   Model Prediction Accuracy
                 </span>
                 <div className="text-3xl font-extrabold text-[#2a632d] mt-2">
-                  {results.predictionAccuracy}%
+                  {results.predictionAccuracy != null ? `${results.predictionAccuracy}%` : '96.44%'}
                 </div>
                 <div className="text-[10px] text-slate-500 mt-1 font-mono">
-                  Formula: 100 − Error Rate (%)
+                  {results.errorRate != null
+                    ? 'Formula: 100 − Error Rate (%)'
+                    : 'Research Model Benchmark (N=222, 96.44%)'}
+                </div>
+              </div>
+            </div>
+
+            {/* Regression Equation Formula Card (Table 1, Page 30) */}
+            <div className="bg-[#2a632d]/5 rounded-xl border border-[#2a632d]/25 p-5">
+              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 mb-3">
+                <span className="text-xs uppercase font-extrabold text-[#2a632d] tracking-wider">
+                  Formed Multiple Linear Regression Model (5 Significant Predictor Factors)
+                </span>
+                <span className="text-[11px] font-bold text-slate-600 bg-white px-2 py-0.5 rounded border border-slate-200">
+                  R = 0.886 | R² = 0.785 | F = 72.706 (p = 0.000)
+                </span>
+              </div>
+              <div className="p-3 bg-white rounded-lg border border-slate-200 font-mono text-xs sm:text-sm text-slate-900 overflow-x-auto font-semibold">
+                Grades = 80.92 + 0.294(PMI) + 0.887(CM) + 0.865(OPI) − 1.281(MAnx) + 1.673(MSc)
+              </div>
+              <div className="grid grid-cols-2 sm:grid-cols-5 gap-2 mt-3 text-[11px] text-slate-600">
+                <div className="bg-white/80 p-2 rounded border border-slate-200/70">
+                  <strong className="block text-slate-800">PMI: {results.pmiScore}</strong>
+                  <span>Parent Monthly Income (p=.049)</span>
+                </div>
+                <div className="bg-white/80 p-2 rounded border border-slate-200/70">
+                  <strong className="block text-slate-800">CM: {results.concentrationScore}</strong>
+                  <span>Concentration &amp; Memory (p=.043)</span>
+                </div>
+                <div className="bg-white/80 p-2 rounded border border-slate-200/70">
+                  <strong className="block text-slate-800">OPI: {results.organizingScore}</strong>
+                  <span>Organizing &amp; Processing (p=.046)</span>
+                </div>
+                <div className="bg-white/80 p-2 rounded border border-slate-200/70">
+                  <strong className="block text-slate-800">MAnx: {results.anxietyScore}</strong>
+                  <span>Math Anxiety (p=.001)</span>
+                </div>
+                <div className="bg-white/80 p-2 rounded border border-slate-200/70">
+                  <strong className="block text-slate-800">MSc: {results.selfConceptScore}</strong>
+                  <span>Math Self-Concept (p=.000)</span>
                 </div>
               </div>
             </div>

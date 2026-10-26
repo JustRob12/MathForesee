@@ -146,7 +146,7 @@ export function normalizeSurveyResponse(row: any): any {
   return {
     ...row,
     answers: cleanAnswers,
-    is_completed: row.is_completed ?? meta.is_completed ?? (row.average_grade != null),
+    is_completed: row.is_completed ?? meta.is_completed ?? (row.predicted_grade != null || row.average_grade != null),
     current_category: row.current_category ?? meta.current_category ?? 'concentration',
     error_rate: row.error_rate ?? meta.error_rate,
     prediction_accuracy: row.prediction_accuracy ?? meta.prediction_accuracy,

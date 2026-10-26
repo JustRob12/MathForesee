@@ -126,12 +126,12 @@ export default function DashboardPage() {
         if (completed) {
           activeSurvey = completed;
         } else {
-          // Check for any survey response with average_grade recorded
+          // Check for any survey response with completed survey recorded
           const { data: gradeSurvey } = await supabase
             .from('survey_responses')
             .select('*')
             .eq('user_id', user.id)
-            .not('average_grade', 'is', null)
+            .or('is_completed.eq.true,predicted_grade.not.is.null')
             .order('created_at', { ascending: false })
             .limit(1)
             .maybeSingle();
@@ -158,20 +158,18 @@ export default function DashboardPage() {
           const normalized = normalizeSurveyResponse(activeSurvey);
           const answeredCount = countAnsweredQuestions(normalized.answers);
 
-          // If the student has answered all 32 questions and has Q1, Q2, Q3 grades:
+          // If the student has answered all 32 questions:
           // Immediately auto-finalize and calculate so the dashboard displays "ASSESSMENT COMPLETED" and "View Math Result"!
           if (
-            (!normalized.is_completed || normalized.average_grade == null) &&
-            answeredCount === 32 &&
-            normalized.grade_q1 != null &&
-            normalized.grade_q2 != null &&
-            normalized.grade_q3 != null
+            (!normalized.is_completed || normalized.predicted_grade == null) &&
+            answeredCount === 32
           ) {
             const computed = calculateSurveyResults(
               normalized.grade_q1,
               normalized.grade_q2,
               normalized.grade_q3,
-              normalized.answers
+              normalized.answers,
+              normalized.monthly_income
             );
 
             const finalized = {
@@ -229,7 +227,7 @@ export default function DashboardPage() {
   const email = dbProfile?.email || user?.email || 'student@mathforesee.com';
 
   const hasCompletedSurvey =
-    surveyData && surveyData.is_completed !== false && surveyData.average_grade !== undefined && surveyData.average_grade !== null;
+    !!surveyData && (surveyData.is_completed === true || (surveyData.predicted_grade != null && surveyData.predicted_grade > 0));
 
   // Safely count questions answered out of 32 (ignoring metadata, so it can never be 33)
   const draftAnsweredCount = countAnsweredQuestions(surveyData?.answers);
@@ -586,10 +584,12 @@ export default function DashboardPage() {
                     Actual Average Grade
                   </span>
                   <div className="text-3xl font-extrabold text-slate-900 mt-1">
-                    {surveyData.average_grade}%
+                    {surveyData.average_grade != null ? `${surveyData.average_grade}%` : 'Optional (N/A)'}
                   </div>
                   <span className="text-[10px] text-slate-500 mt-1 block">
-                    Formula: (Q1: {surveyData.grade_q1} + Q2: {surveyData.grade_q2} + Q3: {surveyData.grade_q3}) / 3
+                    {surveyData.average_grade != null
+                      ? `Formula: (Q1: ${surveyData.grade_q1 ?? '-'} + Q2: ${surveyData.grade_q2 ?? '-'} + Q3: ${surveyData.grade_q3 ?? '-'}) / 3`
+                      : 'Quarterly grades were not provided'}
                   </span>
                 </div>
 
@@ -600,8 +600,8 @@ export default function DashboardPage() {
                   <div className="text-3xl font-extrabold text-[#2a632d] mt-1">
                     {surveyData.predicted_grade}%
                   </div>
-                  <span className="inline-block px-1.5 py-0.2 rounded text-[10px] font-bold bg-[#f6d548] text-slate-900 mt-1">
-                    Multiple Linear Regression
+                  <span className="inline-block px-1.5 py-0.5 rounded text-[10px] font-bold bg-[#f6d548] text-slate-900 mt-1">
+                    Formed Regression (5 Significant Factors)
                   </span>
                 </div>
 
@@ -610,10 +610,12 @@ export default function DashboardPage() {
                     Model Prediction Accuracy
                   </span>
                   <div className="text-3xl font-extrabold text-[#2a632d] mt-1">
-                    {surveyData.prediction_accuracy ?? Number((100 - (surveyData.error_rate ?? 5.4)).toFixed(2))}%
+                    {surveyData.prediction_accuracy != null ? `${surveyData.prediction_accuracy}%` : '96.44%'}
                   </div>
                   <span className="text-[10px] text-slate-500 mt-1 block font-mono">
-                    Formula: 100 − Error Rate (%)
+                    {surveyData.error_rate != null
+                      ? 'Formula: 100 − Error Rate (%)'
+                      : 'Research Benchmark (Table 2, N=222)'}
                   </span>
                 </div>
 
@@ -622,11 +624,50 @@ export default function DashboardPage() {
                     Accuracy Test Error Rate
                   </span>
                   <div className="text-3xl font-extrabold text-slate-900 mt-1">
-                    {surveyData.error_rate ?? 5.4}%
+                    {surveyData.error_rate != null ? `${surveyData.error_rate}%` : '3.56%'}
                   </div>
                   <span className="text-[10px] text-slate-500 mt-1 block font-mono">
-                    [(|Actual − Pred|) / Actual] × 100
+                    {surveyData.error_rate != null
+                      ? '[(|Actual − Pred|) / Actual] × 100'
+                      : 'Research Benchmark Average (Table 2)'}
                   </span>
+                </div>
+              </div>
+
+              {/* Formed Regression Equation Details Card (Table 1, Page 30) */}
+              <div className="mt-5 p-4 rounded-xl bg-[#2a632d]/5 border border-[#2a632d]/20">
+                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-1.5 mb-2">
+                  <span className="text-xs font-bold text-[#2a632d] uppercase tracking-wide">
+                    Formed Multiple Linear Regression Model (Table 1, Page 30)
+                  </span>
+                  <span className="text-[10px] font-semibold text-slate-600 bg-white px-2 py-0.5 rounded border border-slate-200 self-start sm:self-auto">
+                    R = 0.886 | R² = 0.785 | F = 72.706 (p = 0.000)
+                  </span>
+                </div>
+                <div className="p-2.5 bg-white rounded-lg border border-slate-200 font-mono text-xs sm:text-sm text-slate-900 font-bold overflow-x-auto">
+                  Grades = 80.92 + 0.294(PMI) + 0.887(CM) + 0.865(OPI) − 1.281(MAnx) + 1.673(MSc)
+                </div>
+                <div className="grid grid-cols-2 sm:grid-cols-5 gap-2 mt-2.5 text-[10px] text-slate-600">
+                  <div className="bg-white/80 p-2 rounded border border-slate-200/70">
+                    <strong className="block text-slate-800">PMI: {surveyData.monthly_income ? surveyData.monthly_income.split(' ')[0] : 'Standard'}</strong>
+                    <span>Parent Income (p=.049)</span>
+                  </div>
+                  <div className="bg-white/80 p-2 rounded border border-slate-200/70">
+                    <strong className="block text-slate-800">CM: {surveyData.concentration_memory_score ?? '-'}</strong>
+                    <span>Concentration (p=.043)</span>
+                  </div>
+                  <div className="bg-white/80 p-2 rounded border border-slate-200/70">
+                    <strong className="block text-slate-800">OPI: {surveyData.organizing_processing_score ?? '-'}</strong>
+                    <span>Organization (p=.046)</span>
+                  </div>
+                  <div className="bg-white/80 p-2 rounded border border-slate-200/70">
+                    <strong className="block text-slate-800">MAnx: {surveyData.math_anxiety_score ?? '-'}</strong>
+                    <span>Math Anxiety (p=.001)</span>
+                  </div>
+                  <div className="bg-white/80 p-2 rounded border border-slate-200/70">
+                    <strong className="block text-slate-800">MSc: {surveyData.math_self_concept_score ?? '-'}</strong>
+                    <span>Self-Concept (p=.000)</span>
+                  </div>
                 </div>
               </div>
 
