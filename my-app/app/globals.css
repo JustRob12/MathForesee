@@ -44,3 +44,83 @@ body {
 ::-webkit-scrollbar-thumb:hover {
   background: #94a3b8;
 }
+
+/* Creative EdTech Animations & Doodle Mesh */
+@keyframes float-slow {
+  0%, 100% {
+    transform: translateY(0px) rotate(0deg);
+  }
+  50% {
+    transform: translateY(-8px) rotate(3deg);
+  }
+}
+
+@keyframes float-reverse {
+  0%, 100% {
+    transform: translateY(0px) rotate(0deg);
+  }
+  50% {
+    transform: translateY(8px) rotate(-3deg);
+  }
+}
+
+@keyframes pulse-subtle {
+  0%, 100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.88;
+    transform: scale(1.02);
+  }
+}
+
+.animate-float-slow {
+  animation: float-slow 6s ease-in-out infinite;
+}
+
+.animate-float-reverse {
+  animation: float-reverse 7s ease-in-out infinite;
+}
+
+.animate-pulse-subtle {
+  animation: pulse-subtle 3s ease-in-out infinite;
+}
+
+/* Subtle Math Graph Paper / Dot Pattern */
+.bg-math-pattern {
+  background-color: #f8faf9;
+  background-image: 
+    radial-gradient(#2a632d0d 1.2px, transparent 1.2px),
+    radial-gradient(#f6d54815 1.2px, #f8faf9 1.2px);
+  background-size: 28px 28px;
+  background-position: 0 0, 14px 14px;
+}
+
+/* Tactile 3D press feel for buttons */
+.btn-tactile-green {
+  border-bottom: 3px solid #1a3d1c;
+  transition: all 0.15s ease-in-out;
+}
+.btn-tactile-green:hover {
+  transform: translateY(-1px);
+  border-bottom-width: 4px;
+}
+.btn-tactile-green:active {
+  transform: translateY(2px);
+  border-bottom-width: 1px;
+}
+
+.btn-tactile-gold {
+  border-bottom: 3px solid #b48c08;
+  transition: all 0.15s ease-in-out;
+}
+.btn-tactile-gold:hover {
+  transform: translateY(-1px);
+  border-bottom-width: 4px;
+}
+.btn-tactile-gold:active {
+  transform: translateY(2px);
+  border-bottom-width: 1px;
+}
+

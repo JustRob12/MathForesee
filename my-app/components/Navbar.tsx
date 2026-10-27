@@ -25,10 +25,12 @@ export default function Navbar() {
   const pathname = usePathname();
   const supabase = createClient();
 
-  // Close mobile menu on route change
-  useEffect(() => {
+  // Close mobile menu on route change without effect setState cascade
+  const [prevPathname, setPrevPathname] = useState(pathname);
+  if (prevPathname !== pathname) {
+    setPrevPathname(pathname);
     setMobileMenuOpen(false);
-  }, [pathname]);
+  }
 
   useEffect(() => {
     async function checkUserAndSurvey() {
